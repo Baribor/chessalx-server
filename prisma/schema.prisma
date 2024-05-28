@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  username     String      @unique
+  firstName    String
+  lastName     String
+  email        String      @unique
+  profilePic   String?
+  passwordHash String?
+  gender       GENDER
+  role         ROLE        @default(user)
+  createdAt    DateTime    @default(now())
+  signupMode   SIGNUP_MODE @default(form)
+  whiteGames   Game[]      @relation("WhiteGames")
+  blackGames   Game[]      @relation("BlackGames")
+}
+
+model Game {
+  id            Int          @id @default(autoincrement())
+  status        GAME_STATUS  @default(pending)
+  pgn           String?
+  started       DateTime?
+  ended         DateTime?
+  termination   TERMINATION?
+  whitePlayerId String?
+  blackPlayerId String?
+  whitePlayer   User?        @relation("WhiteGames", fields: [whitePlayerId], references: [id], onDelete: Cascade)
+  blackPlayer   User?        @relation("BlackGames", fields: [blackPlayerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model VerificationCode {
+  id        Int      @id @default(autoincrement())
+  code      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+enum GAME_STATUS {
+  ongoing
+  completed
+  pending
+}
+
+enum GENDER {
+  male
+  female
+  other
+}
+
+enum TERMINATION {
+  checkmate
+  stalemate
+  resignation
+  draw
+}
+
+enum SIGNUP_MODE {
+  google
+  form
+}
+
+enum ROLE {
+  user
+  admin
+}
