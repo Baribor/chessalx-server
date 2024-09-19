@@ -1,22 +1,7 @@
 import { PickType } from '@nestjs/mapped-types';
-import { GENDER } from '@prisma/client';
-import {
-  IsEmail,
-  IsIn,
-  IsNotEmpty,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class SignUpDTO {
-  @IsNotEmpty()
-  @IsString()
-  firstName: string;
-
-  @IsNotEmpty()
-  @IsString()
-  lastName: string;
-
   @IsNotEmpty()
   @IsString()
   username: string;
@@ -29,10 +14,6 @@ export class SignUpDTO {
   @IsString()
   @MinLength(6)
   password: string;
-
-  @IsNotEmpty()
-  @IsIn(Object.values(GENDER))
-  gender: GENDER;
 }
 
 export class LoginDTO extends PickType(SignUpDTO, ['password'] as const) {

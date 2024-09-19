@@ -14,7 +14,7 @@ import {
 import { AuthUser, BaseResponseDTO } from 'src/utils/types/utils.types';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { sendMail } from 'src/utils/utils.mail';
-import { GENDER, SIGNUP_MODE } from '@prisma/client';
+import { GAME_STATUS, SIGNUP_MODE } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { genSalt, compareSync, hash } from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
@@ -65,24 +65,33 @@ export class AuthService {
   }
 
   async signup(payload: SignUpDTO): Promise<BaseResponseDTO> {
-    if (
-      await this.prisma.user.findFirst({
-        where: {
-          email: {
-            equals: payload.email,
-            mode: 'insensitive',
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          {
+            email: {
+              equals: payload.email,
+              mode: 'insensitive',
+            },
           },
-        },
-      })
-    ) {
+          {
+            username: {
+              equals: payload.username,
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+    });
+    if (existingUser?.email === payload.email.toLocaleLowerCase()) {
       throw new ConflictException('user with email already exist');
+    }
+    if (existingUser?.username === payload.username.toLocaleLowerCase()) {
+      throw new ConflictException('user with username already exist');
     }
     const user = await this.prisma.user.create({
       data: {
         email: payload.email.toLowerCase(),
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        gender: payload.gender,
         username: payload.username,
         passwordHash: await this.generateHash(payload.password),
       },
@@ -124,8 +133,7 @@ export class AuthService {
       select: {
         email: true,
         profilePic: true,
-        firstName: true,
-        lastName: true,
+        username: true,
         id: true,
         role: true,
         signupMode: true,
@@ -138,6 +146,36 @@ export class AuthService {
       throw new ForbiddenException('incorrect email or password');
     }
 
+    const activeGame = await this.prisma.game.findFirst({
+      where: {
+        OR: [
+          {
+            whitePlayerId: user.id,
+          },
+          {
+            blackPlayerId: user.id,
+          },
+        ],
+        status: GAME_STATUS.ongoing,
+      },
+      include: {
+        blackPlayer: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+        whitePlayer: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    });
+
     return {
       status: true,
       message: 'Login successful',
@@ -149,6 +187,7 @@ export class AuthService {
           id: user.id,
           role: user.role,
         }),
+        activeGame,
       },
     };
   }
@@ -288,9 +327,6 @@ export class AuthService {
       select: {
         email: true,
         profilePic: true,
-        firstName: true,
-        lastName: true,
-        gender: true,
         username: true,
         id: true,
         role: true,
@@ -336,20 +372,14 @@ export class AuthService {
 
     const newUser = await this.prisma.user.create({
       data: {
-        firstName: userInfo.given_name,
-        lastName: userInfo.family_name,
         email: userInfo.email,
         profilePic: userInfo.picture,
         signupMode: SIGNUP_MODE.google,
         username: 'jdks',
-        gender: GENDER.other,
       },
       select: {
         email: true,
-        firstName: true,
-        lastName: true,
         username: true,
-        gender: true,
         id: true,
         profilePic: true,
         createdAt: true,

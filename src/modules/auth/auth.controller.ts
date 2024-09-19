@@ -22,10 +22,14 @@ import { AuthUser, BaseResponseDTO } from 'src/utils/types/utils.types';
 import { CurrentUser } from 'src/schematics/decorators/custom.decorator';
 import { AuthGuard } from 'src/schematics/gaurds/auth.gaurd';
 import { Response } from 'express';
+import { PusherService } from 'src/pusher/pusher.service';
 
 @Controller('/api/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly pusherSrv: PusherService,
+  ) {}
 
   @Post('/signup')
   async signup(@Body() payload: SignUpDTO): Promise<BaseResponseDTO> {
@@ -117,5 +121,43 @@ export class AuthController {
       status: true,
       message: 'logged out successfully',
     };
+  }
+
+  @Post('pusher')
+  @UseGuards(AuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async pusherAuth(
+    @CurrentUser() user: AuthUser,
+    @Body() payload: any,
+    @Res() res: Response,
+  ) {
+    const authResponse = this.pusherSrv
+      .getPusher()
+      .authorizeChannel(payload.socket_id, payload.channel_name, {
+        user_id: user.id,
+        user_info: {
+          email: user.email,
+          role: user.role,
+        },
+      });
+    return res.json(authResponse);
+  }
+
+  @Post('pusher-signin')
+  @UseGuards(AuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async pusherSign(
+    @CurrentUser() user: AuthUser,
+    @Body() payload: any,
+    @Res() res: Response,
+  ) {
+    const authResponse = this.pusherSrv
+      .getPusher()
+      .authenticateUser(payload.socket_id, {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      });
+    return res.json(authResponse);
   }
 }
