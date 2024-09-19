@@ -23,6 +23,14 @@ export class GameController {
     @CurrentUser() user: AuthUser,
     @Body() payload: AcceptGameDTO,
   ) {
-    return await this.gameService.acceptGame(payload.gameId);
+    return await this.gameService.acceptGame(payload.gameId, user.id);
+  }
+
+  @Post('resign')
+  async resignGame(
+    @CurrentUser() user: AuthUser,
+    @Body() payload: AcceptGameDTO,
+  ) {
+    return await this.gameService.resignGame(payload.gameId);
   }
 }

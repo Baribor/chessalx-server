@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { GAME_STATUS } from '@prisma/client';
+import { GAME_STATUS, TERMINATION } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PusherService } from 'src/pusher/pusher.service';
 import { BaseResponseDTO } from 'src/utils/types/utils.types';
@@ -60,7 +60,7 @@ export class GameService {
     };
   }
 
-  async acceptGame(gameId: number): Promise<BaseResponseDTO> {
+  async acceptGame(gameId: number, userId: string): Promise<BaseResponseDTO> {
     const game = await this.prisma.game.findFirst({
       where: {
         id: gameId,
@@ -96,11 +96,47 @@ export class GameService {
       },
     });
 
+    const opponentId =
+      userId === game.blackPlayerId ? game.whitePlayerId : game.blackPlayerId;
+
+    await this.pusherApp
+      .getPusher()
+      .sendToUser(opponentId, 'request-accepted', game);
     return {
       status: true,
       message: 'Game started',
       type: 'object',
       data: newGame,
+    };
+  }
+
+  async resignGame(gameId: number): Promise<BaseResponseDTO> {
+    const game = await this.prisma.game.findFirst({
+      where: {
+        id: gameId,
+      },
+    });
+
+    if (!game) {
+      throw new NotFoundException('game with the id was not found');
+    }
+
+    await this.prisma.game.update({
+      where: {
+        id: game.id,
+      },
+      data: {
+        status: GAME_STATUS.completed,
+        termination: TERMINATION.resignation,
+      },
+    });
+
+    await this.pusherApp
+      .getPusher()
+      .trigger('private-move', 'game-resign', game);
+    return {
+      status: true,
+      message: 'Game resigned',
     };
   }
 }
